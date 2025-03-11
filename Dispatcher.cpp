@@ -22,8 +22,10 @@
 #define htonll(x) ((((uint64_t)htonl(x)) << 32) | htonl((x) >> 32))
 #endif
 
-static std::string::size_type fromHex(char c) {
-	if (c >= 'A' && c <= 'F') {
+static std::string::size_type fromHex(char c)
+{
+	if (c >= 'A' && c <= 'F')
+	{
 		c += 'a' - 'A';
 	}
 
@@ -32,14 +34,16 @@ static std::string::size_type fromHex(char c) {
 	return ret;
 }
 
-static cl_ulong4 fromHex(const std::string & strHex) {
+static cl_ulong4 fromHex(const std::string &strHex)
+{
 	uint8_t data[32];
 	std::fill(data, data + sizeof(data), cl_uchar(0));
 
 	auto index = 0;
-	for(size_t i = 0; i < strHex.size(); i += 2) {
+	for (size_t i = 0; i < strHex.size(); i += 2)
+	{
 		const auto indexHi = fromHex(strHex[i]);
-		const auto indexLo = i + 1 < strHex.size() ? fromHex(strHex[i+1]) : std::string::npos;
+		const auto indexLo = i + 1 < strHex.size() ? fromHex(strHex[i + 1]) : std::string::npos;
 
 		const auto valHi = (indexHi == std::string::npos) ? 0 : indexHi << 4;
 		const auto valLo = (indexLo == std::string::npos) ? 0 : indexLo;
@@ -54,16 +58,17 @@ static cl_ulong4 fromHex(const std::string & strHex) {
 			htonll(*(uint64_t *)(data + 16)),
 			htonll(*(uint64_t *)(data + 8)),
 			htonll(*(uint64_t *)(data + 0)),
-		}
-	};
+		}};
 	return res;
 }
 
-static std::string toHex(const uint8_t * const s, const size_t len) {
+static std::string toHex(const uint8_t *const s, const size_t len)
+{
 	std::string b("0123456789abcdef");
 	std::string r;
 
-	for (size_t i = 0; i < len; ++i) {
+	for (size_t i = 0; i < len; ++i)
+	{
 		const unsigned char h = s[i] / 16;
 		const unsigned char l = s[i] % 16;
 
@@ -73,7 +78,8 @@ static std::string toHex(const uint8_t * const s, const size_t len) {
 	return r;
 }
 
-static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> & timeStart, const Mode & mode) {
+static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> &timeStart, const Mode &mode)
+{
 	// Time delta
 	const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
 
@@ -81,9 +87,12 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 	cl_ulong carry = 0;
 	cl_ulong4 seedRes;
 
-	seedRes.s[0] = seed.s[0] + round; carry = seedRes.s[0] < round;
-	seedRes.s[1] = seed.s[1] + carry; carry = !seedRes.s[1];
-	seedRes.s[2] = seed.s[2] + carry; carry = !seedRes.s[2];
+	seedRes.s[0] = seed.s[0] + round;
+	carry = seedRes.s[0] < round;
+	seedRes.s[1] = seed.s[1] + carry;
+	carry = !seedRes.s[1];
+	seedRes.s[2] = seed.s[2] + carry;
+	carry = !seedRes.s[2];
 	seedRes.s[3] = seed.s[3] + carry + r.foundId;
 
 	std::ostringstream ss;
@@ -96,13 +105,26 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 
 	// Print
 	const std::string strVT100ClearLine = "\33[2K\r";
-	std::cout << strVT100ClearLine << "  Time: " << std::setw(5) << seconds << "s Score: " << std::setw(2) << (int) score << " Private: 0x" << strPrivate << ' ';
+	const char *resultPath = std::getenv("RESULT_PATH");
+	std::string filePath = resultPath ? resultPath : "result.jsonl";
+	std::ofstream resultFile(filePath, std::ios::app);
+	if (resultFile.is_open())
+	{
+		resultFile << "{\"time\":" << seconds << ",\"score\":" << (int)score << ",\"private\":\"0x" << strPrivate << "\",\"public\":\"0x" << strPublic << "\"}" << std::endl;
+		resultFile.close();
+	}
+	else
+	{
+		std::cerr << "Unable to open file: " << filePath << std::endl;
+	}
+	std::cout << strVT100ClearLine << "  Time: " << std::setw(5) << seconds << "s Score: " << std::setw(2) << (int)score << " Private: 0x" << strPrivate << ' ';
 
 	std::cout << mode.transformName();
 	std::cout << ": 0x" << strPublic << std::endl;
 }
 
-unsigned int getKernelExecutionTimeMicros(cl_event & e) {
+unsigned int getKernelExecutionTimeMicros(cl_event &e)
+{
 	cl_ulong timeStart = 0, timeEnd = 0;
 	clWaitForEvents(1, &e);
 	clGetEventProfilingInfo(e, CL_PROFILING_COMMAND_START, sizeof(timeStart), &timeStart, NULL);
@@ -110,20 +132,21 @@ unsigned int getKernelExecutionTimeMicros(cl_event & e) {
 	return (timeEnd - timeStart) / 1000;
 }
 
-Dispatcher::OpenCLException::OpenCLException(const std::string s, const cl_int res) :
-	std::runtime_error( s + " (res = " + toString(res) + ")"),
-	m_res(res)
+Dispatcher::OpenCLException::OpenCLException(const std::string s, const cl_int res) : std::runtime_error(s + " (res = " + toString(res) + ")"),
+																					  m_res(res)
 {
-
 }
 
-void Dispatcher::OpenCLException::OpenCLException::throwIfError(const std::string s, const cl_int res) {
-	if (res != CL_SUCCESS) {
+void Dispatcher::OpenCLException::OpenCLException::throwIfError(const std::string s, const cl_int res)
+{
+	if (res != CL_SUCCESS)
+	{
 		throw OpenCLException(s, res);
 	}
 }
 
-cl_command_queue Dispatcher::Device::createQueue(cl_context & clContext, cl_device_id & clDeviceId) {
+cl_command_queue Dispatcher::Device::createQueue(cl_context &clContext, cl_device_id &clDeviceId)
+{
 	// nVidia CUDA Toolkit 10.1 only supports OpenCL 1.2 so we revert back to older functions for compatability
 #ifdef PROFANITY_DEBUG
 	cl_command_queue_properties p = CL_QUEUE_PROFILING_ENABLE;
@@ -139,12 +162,14 @@ cl_command_queue Dispatcher::Device::createQueue(cl_context & clContext, cl_devi
 	return ret == NULL ? throw std::runtime_error("failed to create command queue") : ret;
 }
 
-cl_kernel Dispatcher::Device::createKernel(cl_program & clProgram, const std::string s) {
-	cl_kernel ret  = clCreateKernel(clProgram, s.c_str(), NULL);
+cl_kernel Dispatcher::Device::createKernel(cl_program &clProgram, const std::string s)
+{
+	cl_kernel ret = clCreateKernel(clProgram, s.c_str(), NULL);
 	return ret == NULL ? throw std::runtime_error("failed to create kernel \"" + s + "\"") : ret;
 }
 
-cl_ulong4 Dispatcher::Device::createSeed() {
+cl_ulong4 Dispatcher::Device::createSeed()
+{
 #ifdef PROFANITY_DEBUG
 	cl_ulong4 r;
 	r.s[0] = 1;
@@ -167,66 +192,55 @@ cl_ulong4 Dispatcher::Device::createSeed() {
 #endif
 }
 
-Dispatcher::Device::Device(Dispatcher & parent, cl_context & clContext, cl_program & clProgram, cl_device_id clDeviceId, const size_t worksizeLocal, const size_t size, const size_t index, const Mode & mode, cl_ulong4 clSeedX, cl_ulong4 clSeedY) :
-	m_parent(parent),
-	m_index(index),
-	m_clDeviceId(clDeviceId),
-	m_worksizeLocal(worksizeLocal),
-	m_clScoreMax(0),
-	m_clQueue(createQueue(clContext, clDeviceId) ),
-	m_kernelInit( createKernel(clProgram, "profanity_init") ),
-	m_kernelInverse(createKernel(clProgram, "profanity_inverse")),
-	m_kernelIterate(createKernel(clProgram, "profanity_iterate")),
-	m_kernelTransform( mode.transformKernel() == "" ? NULL : createKernel(clProgram, mode.transformKernel())),
-	m_kernelScore(createKernel(clProgram, mode.kernel)),
-	m_memPrecomp(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, sizeof(g_precomp), g_precomp),
-	m_memPointsDeltaX(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
-	m_memInversedNegativeDoubleGy(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
-	m_memPrevLambda(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
-	m_memResult(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, PROFANITY_MAX_SCORE + 1),
-	m_memData1(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 20),
-	m_memData2(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 20),
-	m_clSeed(createSeed()),
-	m_clSeedX(clSeedX),
-	m_clSeedY(clSeedY),
-	m_round(0),
-	m_speed(PROFANITY_SPEEDSAMPLES),
-	m_sizeInitialized(0),
-	m_eventFinished(NULL)
-{
-
-}
-
-Dispatcher::Device::~Device() {
-
-}
-
-Dispatcher::Dispatcher(cl_context & clContext, cl_program & clProgram, const Mode mode, const size_t worksizeMax, const size_t inverseSize, const size_t inverseMultiple, const cl_uchar clScoreQuit, const std::string & seedPublicKey)
-	: m_clContext(clContext)
-	, m_clProgram(clProgram)
-	, m_mode(mode)
-	, m_worksizeMax(worksizeMax)
-	, m_inverseSize(inverseSize)
-	, m_size(inverseSize*inverseMultiple)
-	, m_clScoreMax(mode.score)
-	, m_clScoreQuit(clScoreQuit)
-	, m_eventFinished(NULL)
-	, m_countPrint(0)
-	, m_publicKeyX(fromHex(seedPublicKey.substr(0, 64)))
-	, m_publicKeyY(fromHex(seedPublicKey.substr(64, 64)))
+Dispatcher::Device::Device(Dispatcher &parent, cl_context &clContext, cl_program &clProgram, cl_device_id clDeviceId, const size_t worksizeLocal, const size_t size, const size_t index, const Mode &mode, cl_ulong4 clSeedX, cl_ulong4 clSeedY) : m_parent(parent),
+																																																												   m_index(index),
+																																																												   m_clDeviceId(clDeviceId),
+																																																												   m_worksizeLocal(worksizeLocal),
+																																																												   m_clScoreMax(0),
+																																																												   m_clQueue(createQueue(clContext, clDeviceId)),
+																																																												   m_kernelInit(createKernel(clProgram, "profanity_init")),
+																																																												   m_kernelInverse(createKernel(clProgram, "profanity_inverse")),
+																																																												   m_kernelIterate(createKernel(clProgram, "profanity_iterate")),
+																																																												   m_kernelTransform(mode.transformKernel() == "" ? NULL : createKernel(clProgram, mode.transformKernel())),
+																																																												   m_kernelScore(createKernel(clProgram, mode.kernel)),
+																																																												   m_memPrecomp(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, sizeof(g_precomp), g_precomp),
+																																																												   m_memPointsDeltaX(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
+																																																												   m_memInversedNegativeDoubleGy(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
+																																																												   m_memPrevLambda(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, size, true),
+																																																												   m_memResult(clContext, m_clQueue, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY, PROFANITY_MAX_SCORE + 1),
+																																																												   m_memData1(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 20),
+																																																												   m_memData2(clContext, m_clQueue, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY, 20),
+																																																												   m_clSeed(createSeed()),
+																																																												   m_clSeedX(clSeedX),
+																																																												   m_clSeedY(clSeedY),
+																																																												   m_round(0),
+																																																												   m_speed(PROFANITY_SPEEDSAMPLES),
+																																																												   m_sizeInitialized(0),
+																																																												   m_eventFinished(NULL)
 {
 }
 
-Dispatcher::~Dispatcher() {
-
+Dispatcher::Device::~Device()
+{
 }
 
-void Dispatcher::addDevice(cl_device_id clDeviceId, const size_t worksizeLocal, const size_t index) {
-	Device * pDevice = new Device(*this, m_clContext, m_clProgram, clDeviceId, worksizeLocal, m_size, index, m_mode, m_publicKeyX, m_publicKeyY);
+Dispatcher::Dispatcher(cl_context &clContext, cl_program &clProgram, const Mode mode, const size_t worksizeMax, const size_t inverseSize, const size_t inverseMultiple, const cl_uchar clScoreQuit, const std::string &seedPublicKey)
+	: m_clContext(clContext), m_clProgram(clProgram), m_mode(mode), m_worksizeMax(worksizeMax), m_inverseSize(inverseSize), m_size(inverseSize * inverseMultiple), m_clScoreMax(mode.score), m_clScoreQuit(clScoreQuit), m_eventFinished(NULL), m_countPrint(0), m_publicKeyX(fromHex(seedPublicKey.substr(0, 64))), m_publicKeyY(fromHex(seedPublicKey.substr(64, 64)))
+{
+}
+
+Dispatcher::~Dispatcher()
+{
+}
+
+void Dispatcher::addDevice(cl_device_id clDeviceId, const size_t worksizeLocal, const size_t index)
+{
+	Device *pDevice = new Device(*this, m_clContext, m_clProgram, clDeviceId, worksizeLocal, m_size, index, m_mode, m_publicKeyX, m_publicKeyY);
 	m_vDevices.push_back(pDevice);
 }
 
-void Dispatcher::run() {
+void Dispatcher::run()
+{
 	m_eventFinished = clCreateUserEvent(m_clContext, NULL);
 	timeStart = std::chrono::steady_clock::now();
 
@@ -245,7 +259,8 @@ void Dispatcher::run() {
 	std::cout << "  improve overall performance." << std::endl;
 	std::cout << std::endl;
 
-	for (auto it = m_vDevices.begin(); it != m_vDevices.end(); ++it) {
+	for (auto it = m_vDevices.begin(); it != m_vDevices.end(); ++it)
+	{
 		dispatch(*(*it));
 	}
 
@@ -254,7 +269,8 @@ void Dispatcher::run() {
 	m_eventFinished = NULL;
 }
 
-void Dispatcher::init() {
+void Dispatcher::init()
+{
 	std::cout << "Initializing devices..." << std::endl;
 	std::cout << "  This should take less than a minute. The number of objects initialized on each" << std::endl;
 	std::cout << "  device is equal to inverse-size * inverse-multiple. To lower" << std::endl;
@@ -267,16 +283,18 @@ void Dispatcher::init() {
 	m_sizeInitTotal = m_size * deviceCount;
 	m_sizeInitDone = 0;
 
-	cl_event * const pInitEvents = new cl_event[deviceCount];
+	cl_event *const pInitEvents = new cl_event[deviceCount];
 
-	for (size_t i = 0; i < deviceCount; ++i) {
+	for (size_t i = 0; i < deviceCount; ++i)
+	{
 		pInitEvents[i] = clCreateUserEvent(m_clContext, NULL);
 		m_vDevices[i]->m_eventFinished = pInitEvents[i];
 		initBegin(*m_vDevices[i]);
 	}
 
 	clWaitForEvents(deviceCount, pInitEvents);
-	for (size_t i = 0; i < deviceCount; ++i) {
+	for (size_t i = 0; i < deviceCount; ++i)
+	{
 		m_vDevices[i]->m_eventFinished = NULL;
 		clReleaseEvent(pInitEvents[i]);
 	}
@@ -286,9 +304,11 @@ void Dispatcher::init() {
 	std::cout << std::endl;
 }
 
-void Dispatcher::initBegin(Device & d) {
+void Dispatcher::initBegin(Device &d)
+{
 	// Set mode data
-	for (auto i = 0; i < 20; ++i) {
+	for (auto i = 0; i < 20; ++i)
+	{
 		d.m_memData1[i] = m_mode.data1[i];
 		d.m_memData2[i] = m_mode.data2[i];
 	}
@@ -317,7 +337,8 @@ void Dispatcher::initBegin(Device & d) {
 	d.m_memPrevLambda.setKernelArg(d.m_kernelIterate, 2);
 
 	// Kernel arguments - profanity_transform_*
-	if(d.m_kernelTransform) {
+	if (d.m_kernelTransform)
+	{
 		d.m_memInversedNegativeDoubleGy.setKernelArg(d.m_kernelTransform, 0);
 	}
 
@@ -333,7 +354,8 @@ void Dispatcher::initBegin(Device & d) {
 	initContinue(d);
 }
 
-void Dispatcher::initContinue(Device & d) {
+void Dispatcher::initContinue(Device &d)
+{
 	size_t sizeLeft = m_size - d.m_sizeInitialized;
 	const size_t sizeInitLimit = m_size / 20;
 
@@ -341,7 +363,8 @@ void Dispatcher::initContinue(Device & d) {
 	const size_t percentDone = m_sizeInitDone * 100 / m_sizeInitTotal;
 	std::cout << "  " << percentDone << "%\r" << std::flush;
 
-	if (sizeLeft) {
+	if (sizeLeft)
+	{
 		cl_event event;
 		const size_t sizeRun = std::min(sizeInitLimit, std::min(sizeLeft, m_worksizeMax));
 		const auto resEnqueue = clEnqueueNDRangeKernel(d.m_clQueue, d.m_kernelInit, 1, &d.m_sizeInitialized, &sizeRun, NULL, 0, NULL, &event);
@@ -353,7 +376,7 @@ void Dispatcher::initContinue(Device & d) {
 		// the commands are not required to begin execution until the queue is flushed. In standard usage, blocking enqueue calls serve this role by implicitly
 		// flushing the queue. Since blocking calls are not permitted in callbacks, those callbacks that enqueue commands on a command queue should either call
 		// clFlush on the queue before returning or arrange for clFlush to be called later on another thread.
-		clFlush(d.m_clQueue); 
+		clFlush(d.m_clQueue);
 
 		std::lock_guard<std::mutex> lock(m_mutex);
 		d.m_sizeInitialized += sizeRun;
@@ -361,7 +384,9 @@ void Dispatcher::initContinue(Device & d) {
 
 		const auto resCallback = clSetEventCallback(event, CL_COMPLETE, staticCallback, &d);
 		OpenCLException::throwIfError("failed to set custom callback during initialization", resCallback);
-	} else {
+	}
+	else
+	{
 		// Printing one whole string at once helps in avoiding garbled output when executed in parallell
 		const std::string strOutput = "  GPU" + toString(d.m_index) + " initialized";
 		std::cout << strOutput << std::endl;
@@ -369,12 +394,14 @@ void Dispatcher::initContinue(Device & d) {
 	}
 }
 
-void Dispatcher::enqueueKernel(cl_command_queue & clQueue, cl_kernel & clKernel, size_t worksizeGlobal, const size_t worksizeLocal, cl_event * pEvent = NULL) {
+void Dispatcher::enqueueKernel(cl_command_queue &clQueue, cl_kernel &clKernel, size_t worksizeGlobal, const size_t worksizeLocal, cl_event *pEvent = NULL)
+{
 	const size_t worksizeMax = m_worksizeMax;
 	size_t worksizeOffset = 0;
-	while (worksizeGlobal) {
+	while (worksizeGlobal)
+	{
 		const size_t worksizeRun = std::min(worksizeGlobal, worksizeMax);
-		const size_t * const pWorksizeLocal = (worksizeLocal == 0 ? NULL : &worksizeLocal);
+		const size_t *const pWorksizeLocal = (worksizeLocal == 0 ? NULL : &worksizeLocal);
 		const auto res = clEnqueueNDRangeKernel(clQueue, clKernel, 1, &worksizeOffset, &worksizeRun, pWorksizeLocal, 0, NULL, pEvent);
 		OpenCLException::throwIfError("kernel queueing failed", res);
 
@@ -383,23 +410,31 @@ void Dispatcher::enqueueKernel(cl_command_queue & clQueue, cl_kernel & clKernel,
 	}
 }
 
-void Dispatcher::enqueueKernelDevice(Device & d, cl_kernel & clKernel, size_t worksizeGlobal, cl_event * pEvent = NULL) {
-	try {
+void Dispatcher::enqueueKernelDevice(Device &d, cl_kernel &clKernel, size_t worksizeGlobal, cl_event *pEvent = NULL)
+{
+	try
+	{
 		enqueueKernel(d.m_clQueue, clKernel, worksizeGlobal, d.m_worksizeLocal, pEvent);
-	} catch ( OpenCLException & e ) {
+	}
+	catch (OpenCLException &e)
+	{
 		// If local work size is invalid, abandon it and let implementation decide
-		if ((e.m_res == CL_INVALID_WORK_GROUP_SIZE || e.m_res == CL_INVALID_WORK_ITEM_SIZE) && d.m_worksizeLocal != 0) {
-			std::cout << std::endl << "warning: local work size abandoned on GPU" << d.m_index << std::endl;
+		if ((e.m_res == CL_INVALID_WORK_GROUP_SIZE || e.m_res == CL_INVALID_WORK_ITEM_SIZE) && d.m_worksizeLocal != 0)
+		{
+			std::cout << std::endl
+					  << "warning: local work size abandoned on GPU" << d.m_index << std::endl;
 			d.m_worksizeLocal = 0;
 			enqueueKernel(d.m_clQueue, clKernel, worksizeGlobal, d.m_worksizeLocal, pEvent);
 		}
-		else {
+		else
+		{
 			throw;
 		}
 	}
 }
 
-void Dispatcher::dispatch(Device & d) {
+void Dispatcher::dispatch(Device &d)
+{
 	cl_event event;
 	d.m_memResult.read(false, &event);
 
@@ -414,7 +449,8 @@ void Dispatcher::dispatch(Device & d) {
 	enqueueKernelDevice(d, d.m_kernelIterate, m_size);
 #endif
 
-	if (d.m_kernelTransform) {
+	if (d.m_kernelTransform)
+	{
 		enqueueKernelDevice(d, d.m_kernelTransform, m_size);
 	}
 
@@ -425,7 +461,7 @@ void Dispatcher::dispatch(Device & d) {
 	// We're actually not allowed to call clFinish here because this function is ultimately asynchronously called by OpenCL.
 	// However, this happens to work on my computer and it's not really intended for release, just something to aid me in
 	// optimizations.
-	clFinish(d.m_clQueue); 
+	clFinish(d.m_clQueue);
 	std::cout << "Timing: profanity_inverse = " << getKernelExecutionTimeMicros(eventInverse) << "us, profanity_iterate = " << getKernelExecutionTimeMicros(eventIterate) << "us" << std::endl;
 #endif
 
@@ -433,19 +469,24 @@ void Dispatcher::dispatch(Device & d) {
 	OpenCLException::throwIfError("failed to set custom callback", res);
 }
 
-void Dispatcher::handleResult(Device & d) {
-	for (auto i = PROFANITY_MAX_SCORE; i > m_clScoreMax; --i) {
-		result & r = d.m_memResult[i];
+void Dispatcher::handleResult(Device &d)
+{
+	for (auto i = PROFANITY_MAX_SCORE; i > m_clScoreMax; --i)
+	{
+		result &r = d.m_memResult[i];
 
-		if (r.found > 0 && i >= d.m_clScoreMax) {
+		if (r.found > 0 && i >= d.m_clScoreMax)
+		{
 			d.m_clScoreMax = i;
 			CLMemory<cl_uchar>::setKernelArg(d.m_kernelScore, 4, d.m_clScoreMax);
 
 			std::lock_guard<std::mutex> lock(m_mutex);
-			if (i >= m_clScoreMax) {
+			if (i >= m_clScoreMax)
+			{
 				m_clScoreMax = i;
 
-				if (m_clScoreQuit && i >= m_clScoreQuit) {
+				if (m_clScoreQuit && i >= m_clScoreQuit)
+				{
 					m_quit = true;
 				}
 
@@ -457,13 +498,18 @@ void Dispatcher::handleResult(Device & d) {
 	}
 }
 
-void Dispatcher::onEvent(cl_event event, cl_int status, Device & d) {
-	if (status != CL_COMPLETE) {
+void Dispatcher::onEvent(cl_event event, cl_int status, Device &d)
+{
+	if (status != CL_COMPLETE)
+	{
 		std::cout << "Dispatcher::onEvent - Got bad status: " << status << std::endl;
 	}
-	else if (d.m_eventFinished != NULL) {
+	else if (d.m_eventFinished != NULL)
+	{
 		initContinue(d);
-	} else {
+	}
+	else
+	{
 		++d.m_round;
 		handleResult(d);
 
@@ -473,28 +519,34 @@ void Dispatcher::onEvent(cl_event event, cl_int status, Device & d) {
 			d.m_speed.sample(m_size);
 			printSpeed();
 
-			if( m_quit ) {
+			if (m_quit)
+			{
 				bDispatch = false;
-				if(--m_countRunning == 0) {
+				if (--m_countRunning == 0)
+				{
 					clSetUserEventStatus(m_eventFinished, CL_COMPLETE);
 				}
 			}
 		}
 
-		if (bDispatch) {
+		if (bDispatch)
+		{
 			dispatch(d);
 		}
 	}
 }
 
 // This is run when m_mutex is held.
-void Dispatcher::printSpeed() {
+void Dispatcher::printSpeed()
+{
 	++m_countPrint;
-	if( m_countPrint > m_vDevices.size() ) {
+	if (m_countPrint > m_vDevices.size())
+	{
 		std::string strGPUs;
 		double speedTotal = 0;
 		unsigned int i = 0;
-		for (auto & e : m_vDevices) {
+		for (auto &e : m_vDevices)
+		{
 			const auto curSpeed = e->m_speed.getSpeed();
 			speedTotal += curSpeed;
 			strGPUs += " GPU" + toString(e->m_index) + ": " + formatSpeed(curSpeed);
@@ -507,17 +559,20 @@ void Dispatcher::printSpeed() {
 	}
 }
 
-void CL_CALLBACK Dispatcher::staticCallback(cl_event event, cl_int event_command_exec_status, void * user_data) {
-	Device * const pDevice = static_cast<Device *>(user_data);
+void CL_CALLBACK Dispatcher::staticCallback(cl_event event, cl_int event_command_exec_status, void *user_data)
+{
+	Device *const pDevice = static_cast<Device *>(user_data);
 	pDevice->m_parent.onEvent(event, event_command_exec_status, *pDevice);
 	clReleaseEvent(event);
 }
 
-std::string Dispatcher::formatSpeed(double f) {
+std::string Dispatcher::formatSpeed(double f)
+{
 	const std::string S = " KMGT";
 
 	unsigned int index = 0;
-	while (f > 1000.0f && index < S.size()) {
+	while (f > 1000.0f && index < S.size())
+	{
 		f /= 1000.0f;
 		++index;
 	}
