@@ -559,6 +559,17 @@ void Dispatcher::printSpeed()
 			const std::string strVT100ClearLine = "\33[2K\r";
 			std::cerr << strVT100ClearLine << "Total: " << formatSpeed(speedTotal) << " -" << strGPUs << '\r' << std::flush;
 		}
+		// Write latest hashrate to /tmp/pf2hr
+		std::ofstream hrFile("/tmp/pf2hr");
+		if (hrFile.is_open())
+		{
+			hrFile << formatSpeed(speedTotal) << std::endl;
+			hrFile.close();
+		}
+		else
+		{
+			std::cerr << "Unable to open file: /tmp/pf2hr" << std::endl;
+		}
 		m_countPrint = 0;
 	}
 }
